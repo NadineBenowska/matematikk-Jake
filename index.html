@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Barnespill: Pluss og Minus</title>
+  <style>
+    :root{--bg:#f7fbff;--card:#ffffff;--accent:#6c63ff;--good:#2ecc71;--bad:#ff6b6b}
+    *{box-sizing:border-box}
+    body{font-family:Inter, system-ui, Arial; margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center; background:linear-gradient(180deg,#e9f0ff 0%,var(--bg) 100%); padding:24px}
+    .app{width:100%;max-width:780px;background:var(--card);border-radius:16px;box-shadow:0 8px 30px rgba(20,30,60,0.08);padding:22px}
+    header{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+    h1{font-size:20px;margin:0}
+    .controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+    .btn,button{background:var(--accent);color:white;border:0;padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:600}
+    .btn.secondary{background:#eee;color:#333}
+    .panel{display:flex;gap:12px;align-items:center}
+    label{font-size:14px}
+    input[type=range]{width:140px}
+    main{display:grid;grid-template-columns:1fr 200px;gap:16px;align-items:start}
+    .game{padding:18px;border-radius:12px;border:2px dashed #eef2ff;min-height:200px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+    .problem{font-size:48px;font-weight:700;margin:8px 0}
+    .small{font-size:14px;color:#666}
+    .answerRow{display:flex;gap:8px;align-items:center}
+    input.answer{font-size:28px;padding:8px 12px;border-radius:8px;border:2px solid #eee;width:140px;text-align:center}
+    .meta{padding:12px;border-radius:8px;background:#fbfdff}
+    .stat{display:flex;flex-direction:column;gap:6px}
+    .stat div{font-weight:700}
+    .feedback{height:38px;display:flex;align-items:center;justify-content:center;border-radius:10px;margin-top:10px}
+    .feedback.ok{background:rgba(46,204,113,0.12);color:var(--good)}
+    .feedback.bad{background:rgba(255,107,107,0.12);color:var(--bad)}
+    footer{margin-top:14px;text-align:center;color:#666;font-size:13px}
+    .big{font-size:20px}
+    @media (max-width:700px){main{grid-template-columns:1fr} .meta{order:2}}
+  </style>
+</head>
+<body>
+  <div class="app" role="application" aria-label="Barnespill matematikk">
+    <header>
+      <div style="width:46px;height:46px;background:linear-gradient(135deg,var(--accent),#00c6ff);border-radius:12px;display:flex;align-items:center;justify-content:center;color:white;font-weight:800">+−</div>
+      <div>
+        <h1>Jakes Mattespill</h1>
+        <div class="small">Øv hoderegning: rask og enkel. Trykk Start!</div>
+      </div>
+    </header>
+
+    <div class="controls">
+      <div class="panel">
+        <label for="mode">Operasjon:</label>
+        <select id="mode" aria-label="Velg operasjon">
+          <option value="both">Pluss & Minus</option>
+          <option value="plus">Pluss</option>
+          <option value="minus">Minus</option>
+        </select>
+      </div>
+
+      <div class="panel">
+        <label for="max">Maks tall:</label>
+        <input id="max" type="range" min="5" max="100" value="20">
+        <span id="maxVal">20</span>
+      </div>
+
+      <div class="panel">
+        <label for="timed">Tidsmodus:</label>
+        <input id="timed" type="checkbox">
+        <span class="small">(10 sek / oppgave)</span>
+      </div>
+
+      <button id="start" class="btn">Start</button>
+      <button id="reset" class="btn secondary">Nullstill</button>
+    </div>
+
+    <main>
+      <section class="game" aria-live="polite">
+        <div class="small">Oppgave</div>
+        <div id="problem" class="problem">Trykk Start</div>
+
+        <div class="answerRow">
+          <input id="answer" class="answer" inputmode="numeric" placeholder="Svar" aria-label="Skriv svar">
+          <button id="check" class="btn">Sjekk</button>
+        </div>
+
+        <div id="feedback" class="feedback" aria-atomic="true"></div>
+
+        <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+          <div class="small">Streak: <span id="streak">0</span></div>
+          <div class="small">Riktige: <span id="correct">0</span></div>
+          <div class="small">Feil: <span id="wrong">0</span></div>
+        </div>
+
+        <div id="timer" class="small" style="margin-top:8px"></div>
+      </section>
+
+      <aside class="meta">
+        <div class="stat">
+          <div class="big">Statistikk</div>
+          <div>Poeng: <span id="score">0</span></div>
+          <div>Gj.snitt tid: <span id="avgTime">-</span> sek</div>
+          <div id="hint" class="small">Tips: bruk piltastene og Enter for raskere svar.</div>
+        </div>
+      </aside>
+    </main>
+
+    <footer>Jacob Alexander</footer>
+  </div>
+
+  <script>
+    // Enkel barnespill-implementasjon
+    const problemEl = document.getElementById('problem');
+    const answerEl = document.getElementById('answer');
+    const checkBtn = document.getElementById('check');
+    const startBtn = document.getElementById('start');
+    const resetBtn = document.getElementById('reset');
+    const feedbackEl = document.getElementById('feedback');
+    const streakEl = document.getElementById('streak');
+    const correctEl = document.getElementById('correct');
+    const wrongEl = document.getElementById('wrong');
+    const scoreEl = document.getElementById('score');
+    const avgTimeEl = document.getElementById('avgTime');
+    const timerEl = document.getElementById('timer');
+    const modeEl = document.getElementById('mode');
+    const maxEl = document.getElementById('max');
+    const maxVal = document.getElementById('maxVal');
+    const timedEl = document.getElementById('timed');
+
+    let current = null;
+    let state = {
+      correct:0, wrong:0, streak:0, score:0, times:[], startTime: null, timerId: null
+    };
+
+    function randInt(min,max){ return Math.floor(Math.random()*(max-min+1))+min }
+
+    function makeProblem(){
+      const max = Number(maxEl.value);
+      const mode = modeEl.value;
+      let a = randInt(0, max);
+      let b = randInt(0, max);
+      let op = '+';
+      if(mode === 'minus') op = '-';
+      else if(mode === 'plus') op = '+';
+      else op = Math.random() < 0.5 ? '+' : '-';
+
+      if(op === '-' && b > a) [a,b] = [b,a]; // unngå negative for barn
+      const answer = op === '+' ? a + b : a - b;
+      return {a,b,op,answer};
+    }
+
+    function showProblem(){
+      current = makeProblem();
+      problemEl.textContent = `${current.a} ${current.op} ${current.b} = ?`;
+      answerEl.value = '';
+      answerEl.focus();
+      feedbackEl.textContent = '';
+
+      if(timedEl.checked){
+        startTimer(10);
+      } else {
+        stopTimer();
+      }
+      state.startTime = Date.now();
+    }
+
+    function checkAnswer(){
+      if(!current) return;
+      const raw = answerEl.value.trim();
+      if(raw === '') return flash('Skriv et tall!', 'bad');
+      const num = Number(raw.replace(',', '.'));
+      if(Number.isNaN(num)) return flash('Ugyldig svar', 'bad');
+
+      const timeTaken = (Date.now() - state.startTime)/1000;
+      state.times.push(timeTaken);
+      avgTimeEl.textContent = (state.times.reduce((a,b)=>a+b,0)/state.times.length).toFixed(1);
+
+      if(num === current.answer){
+        state.correct++;
+        state.streak++;
+        state.score += 10 + Math.max(0, 8 - Math.round(timeTaken));
+        flash('Riktig! 🎉', 'ok');
+      } else {
+        state.wrong++;
+        state.streak = 0;
+        state.score = Math.max(0, state.score - 5);
+        flash(`Feil — riktig var ${current.answer}`, 'bad');
+      }
+      updateStats();
+      stopTimer();
+      // Neste oppgave etter kort pause
+      setTimeout(()=> showProblem(), 800);
+    }
+
+    function updateStats(){
+      streakEl.textContent = state.streak;
+      correctEl.textContent = state.correct;
+      wrongEl.textContent = state.wrong;
+      scoreEl.textContent = state.score;
+    }
+
+    function flash(text, type){
+      feedbackEl.textContent = text;
+      feedbackEl.className = 'feedback ' + (type === 'ok' ? 'ok' : 'bad');
+    }
+
+    function resetAll(){
+      state = {correct:0, wrong:0, streak:0, score:0, times:[], startTime:null, timerId:null};
+      updateStats();
+      avgTimeEl.textContent = '-';
+      problemEl.textContent = 'Trykk Start';
+      feedbackEl.textContent = '';
+      stopTimer();
+    }
+
+    function startTimer(seconds){
+      stopTimer();
+      let left = seconds;
+      timerEl.textContent = `Tid igjen: ${left}s`;
+      state.timerId = setInterval(()=>{
+        left--;
+        if(left <= 0){
+          stopTimer();
+          timerEl.textContent = '';
+          // regn som feil
+          state.wrong++;
+          state.streak = 0;
+          flash(`Tiden gikk ut — riktig var ${current.answer}`, 'bad');
+          updateStats();
+          setTimeout(()=> showProblem(), 1000);
+        } else {
+          timerEl.textContent = `Tid igjen: ${left}s`;
+        }
+      },1000);
+    }
+
+    function stopTimer(){
+      if(state.timerId) clearInterval(state.timerId);
+      state.timerId = null;
+      timerEl.textContent = '';
+    }
+
+    // Event listeners
+    checkBtn.addEventListener('click', checkAnswer);
+    startBtn.addEventListener('click', ()=>{
+      resetAll();
+      showProblem();
+    });
+    resetBtn.addEventListener('click', resetAll);
+
+    answerEl.addEventListener('keydown', (e)=>{
+      if(e.key === 'Enter') checkAnswer();
+      else if(e.key === 'ArrowUp' || e.key === 'ArrowRight'){
+        // foreslå neste tall
+        const v = Number(answerEl.value) || 0; answerEl.value = v + 1;
+      } else if(e.key === 'ArrowDown' || e.key === 'ArrowLeft'){
+        const v = Number(answerEl.value) || 0; answerEl.value = Math.max(0, v - 1);
+      }
+    });
+
+    maxEl.addEventListener('input', ()=>{ maxVal.textContent = maxEl.value });
+
+    // Hjelp: la markøren starte i input når vi genererer problem via Enter
+    document.addEventListener('keydown', (e)=>{
+      if(e.key === 's' || e.key === 'S'){
+        // s for start
+        startBtn.click();
+      }
+    });
+
+    // Init
+    maxVal.textContent = maxEl.value;
+  </script>
+</body>
+</html>
